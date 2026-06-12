@@ -237,23 +237,19 @@ function connectIRC(token, ch){
 }
 
 function parseMsg(raw){
-  // Support tags + fallback simple
-  let username='', message='';
-
-  // Avec tags: @display-name=Foo;... :foo!foo@foo.tmi.twitch.tv PRIVMSG #ch :msg
-  const tagMatch = raw.match(/display-name=([^;]+);/);
-  if(tagMatch) username = tagMatch[1].toLowerCase();
-
+  // Format: @tags :nick!nick@nick.tmi.twitch.tv PRIVMSG #channel :message
+  // On lit TOUJOURS le nick IRC — jamais display-name qui peut etre vide ou mal parse
   const privMatch = raw.match(/PRIVMSG #\w+ :(.+)$/);
   if(!privMatch) return;
-  message = privMatch[1].trim();
+  const message = privMatch[1].trim();
+  if(message.toLowerCase() !== '!rot') return;
 
-  if(!username){
-    const nickMatch = raw.match(/^(?:@\S+ )?:(\w+)!/);
-    if(nickMatch) username = nickMatch[1];
-  }
+  // Le nick est toujours l'auteur reel du message
+  const nickMatch = raw.match(/:([\w]+)![\w]+@[\w]+\.tmi\.twitch\.tv PRIVMSG/);
+  if(!nickMatch) return;
+  const username = nickMatch[1];
 
-  if(message.toLowerCase()==='!rot' && username) handleRot(username);
+  handleRot(username);
 }
 
 function handleRot(user){
