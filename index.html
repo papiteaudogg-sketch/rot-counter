@@ -247,7 +247,7 @@ function authBot(){
   if(!cid){ showErr('Remplis le Client ID d\'abord.'); return; }
   sessionStorage.setItem('twitch_clientid', cid);
   sessionStorage.setItem('twitch_auth_step', 'bot');
-  const url = `https://id.twitch.tv/oauth2/authorize?client_id=${cid}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=token&scope=chat:read`;
+  const url = `https://id.twitch.tv/oauth2/authorize?client_id=${cid}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=token&scope=chat%3Aread+chat%3Aedit`;
   location.href = url;
 }
 
@@ -339,6 +339,7 @@ function openIRC(token, nick, ch, isReader){
     const raw = e.data.trim();
     if(raw.startsWith('PING')){ ws.send('PONG :tmi.twitch.tv'); return; }
     if(raw.includes('Login authentication failed')){ showErr('Token invalide pour '+(isReader?'le streamer':'le bot')+'.'); ws.close(); return; }
+    if(!isReader) console.log('[BOT IRC]', raw.substring(0,120));
     if(raw.includes(`JOIN #${ch}`) && isReader){ onConnected(); }
     if(raw.includes('PRIVMSG') && isReader){ parseMsg(raw); }
   };
@@ -391,9 +392,15 @@ function handleRot(viewer){
 }
 
 function sendChat(msg){
+  console.log('[BOT] wsWrite state:', wsWrite ? wsWrite.readyState : 'null');
   if(wsWrite && wsWrite.readyState===1){
-    wsWrite.send(`PRIVMSG #${channel} :${msg}`);
+    const raw = `PRIVMSG #${channel} :${msg}`;
+    console.log('[BOT] Sending:', raw);
+    wsWrite.send(raw);
     addLogBot(msg);
+  } else {
+    console.warn('[BOT] wsWrite not ready, cannot send:', msg);
+    addLogBot('⚠ Bot non connecté — ' + msg);
   }
 }
 
