@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ROT Counter — Twitch</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
+    :root {
+      --bg:#0e0e10; --surface:#18181b; --surface2:#1f1f23; --border:#2a2a2e;
+      --purple:#9147ff; --purple-dim:#6441a5; --green:#00fa9a; --red:#ff4040;
+      --text:#efeff1; --muted:#adadb8;
+      --mono:'JetBrains Mono',monospace; --sans:'Inter',sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;}
+
+    /* HEADER */
+    header{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);}
+    header h1{font-family:var(--mono);font-size:1.05rem;font-weight:700;}
+    header h1 span{color:var(--purple);}
+    .dot{width:9px;height:9px;border-radius:50%;background:var(--red);margin-left:auto;transition:background .3s;}
+    .dot.live{background:var(--green);animation:pdot 2s infinite;}
+    @keyframes pdot{0%,100%{box-shadow:0 0 0 0 rgba(0,250,154,.4);}50%{box-shadow:0 0 0 6px rgba(0,250,154,0);}}
+    #slabel{font-size:.75rem;color:var(--muted);font-family:var(--mono);}
+
+    /* STEPS / SETUP */
+    #setup{max-width:540px;margin:40px auto;padding:0 20px;width:100%;}
+    .step-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;margin-bottom:16px;}
+    .step-num{display:inline-block;background:var(--purple);color:#fff;font-family:var(--mono);font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:4px;margin-bottom:12px;letter-spacing:.06em;}
+    .step-card h2{font-family:var(--mono);font-size:.95rem;margin-bottom:8px;}
+    .step-card p,.step-card li{font-size:.82rem;color:var(--muted);line-height:1.6;}
+    .step-card ul{padding-left:18px;margin-top:6px;}
+    .step-card a{color:var(--purple);text-decoration:none;}
+    .step-card a:hover{text-decoration:underline;}
+    code{font-family:var(--mono);background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:.82rem;color:var(--text);}
+
+    label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:5px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;margin-top:14px;}
+    input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 13px;color:var(--text);font-family:var(--mono);font-size:.85rem;outline:none;transition:border-color .2s;}
+    input:focus{border-color:var(--purple);}
+    .hint{font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.5;}
+
+    .btn{display:block;width:100%;background:var(--purple);border:none;border-radius:6px;padding:12px;color:#fff;font-family:var(--mono);font-weight:700;font-size:.88rem;cursor:pointer;transition:background .15s,transform .1s;margin-top:16px;}
+    .btn:hover{background:#7c3bef;}
+    .btn:active{transform:scale(.98);}
+    .btn:disabled{opacity:.5;cursor:not-allowed;}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+    .btn-ghost:hover{background:var(--surface2);border-color:var(--muted);color:var(--text);}
+
+    #err{margin-top:10px;font-size:.78rem;color:var(--red);font-family:var(--mono);display:none;}
+
+    /* DASHBOARD */
+    #dash{display:none;flex:1;flex-direction:column;gap:20px;padding:24px;max-width:860px;width:100%;margin:0 auto;}
+
+    .chtag{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-family:var(--mono);font-size:.8rem;color:var(--muted);}
+    .chtag strong{color:var(--purple);}
+
+    /* BIG COUNTER */
+    .ccard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 28px;text-align:center;position:relative;overflow:hidden;}
+    .ccard::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(145,71,255,.1) 0%,transparent 65%);pointer-events:none;}
+    .clabel{font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+    #rotnum{font-family:var(--mono);font-size:clamp(5rem,13vw,8.5rem);font-weight:800;line-height:1;display:block;}
+    #rotnum.bump{animation:bump .35s cubic-bezier(.36,.07,.19,.97);}
+    @keyframes bump{0%{transform:scale(1);color:var(--text);}30%{transform:scale(1.16);color:var(--purple);}65%{transform:scale(.97);}100%{transform:scale(1);color:var(--text);}}
+    .csub{margin-top:6px;font-size:.78rem;color:var(--muted);font-family:var(--mono);}
+    .cactions{display:flex;gap:10px;justify-content:center;margin-top:20px;}
+    .cactions .btn{width:auto;padding:8px 18px;font-size:.78rem;}
+
+    /* STATS */
+    .srow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+    .sc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+    .sc .sl{font-size:.7rem;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+    .sc .sv{font-family:var(--mono);font-size:1.5rem;font-weight:700;}
+    .sc .ss{font-size:.7rem;color:var(--muted);margin-top:3px;}
+
+    /* LOG */
+    .lcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+    .lhead{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);}
+    .lhead span{font-family:var(--mono);font-size:.72rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;}
+    .lclear{background:transparent;border:none;width:auto;padding:3px 9px;font-size:.7rem;color:var(--muted);cursor:pointer;border-radius:4px;font-family:var(--mono);}
+    .lclear:hover{background:var(--surface2);color:var(--text);}
+    #logul{list-style:none;max-height:200px;overflow-y:auto;padding:0;}
+    #logul::-webkit-scrollbar{width:3px;}
+    #logul::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+    #logul li{display:flex;align-items:baseline;gap:9px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:.8rem;animation:fi .2s ease;}
+    #logul li:last-child{border-bottom:none;}
+    @keyframes fi{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
+    .lt{font-family:var(--mono);font-size:.68rem;color:var(--purple-dim);flex-shrink:0;}
+    .lu{color:var(--purple);font-weight:600;flex-shrink:0;}
+    .lm{color:var(--muted);}
+    .lempty{padding:20px 16px;font-size:.78rem;color:var(--muted);font-family:var(--mono);text-align:center;}
+
+    @media(max-width:580px){.srow{grid-template-columns:1fr 1fr;}#dash{padding:14px;}}
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#9147ff"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
+  <h1>ROT <span>Counter</span></h1>
+  <span id="slabel">Déconnecté</span>
+  <div class="dot" id="dot"></div>
+</header>
+
+<!-- SETUP -->
+<div id="setup">
+
+  <!-- STEP 1 : créer l'app -->
+  <div class="step-card">
+    <div class="step-num">ÉTAPE 1</div>
+    <h2>Créer une application Twitch (gratuit)</h2>
+    <ul>
+      <li>Va sur <a href="https://dev.twitch.tv/console/apps/create" target="_blank">dev.twitch.tv/console/apps/create</a></li>
+      <li>Nom : ce que tu veux (ex: <code>RotCounter</code>)</li>
+      <li>URL de redirection OAuth : <code id="redirect-url">chargement...</code></li>
+      <li>Catégorie : <code>Chat Bot</code></li>
+      <li>Clique <strong>Créer</strong> → puis <strong>Gérer</strong></li>
+      <li>Copie le <strong>Client ID</strong> ci-dessous</li>
+    </ul>
+  </div>
+
+  <!-- STEP 2 : saisie -->
+  <div class="step-card">
+    <div class="step-num">ÉTAPE 2</div>
+    <h2>Connecte ton bot</h2>
+
+    <label>Client ID (depuis dev.twitch.tv)</label>
+    <input type="text" id="inp-clientid" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off"/>
+    <div class="hint">Trouvé sur la page de ton application Twitch → "Client ID"</div>
+
+    <label>Chaîne à surveiller</label>
+    <input type="text" id="inp-channel" placeholder="papiteau" autocomplete="off"/>
+
+    <button class="btn" id="btn-auth" onclick="startAuth()">Autoriser avec Twitch →</button>
+    <div id="err"></div>
+  </div>
+
+</div>
+
+<!-- DASHBOARD -->
+<div id="dash">
+  <div><span class="chtag">💨 En écoute sur <strong id="dch">—</strong></span></div>
+
+  <div class="ccard">
+    <div class="clabel">Nombre de rots</div>
+    <span id="rotnum">0</span>
+    <div class="csub">depuis le début de la session</div>
+    <div class="cactions">
+      <button class="btn btn-ghost" onclick="resetAll()">Remettre à zéro</button>
+      <button class="btn btn-ghost" onclick="doDisconnect()">Déconnecter</button>
+    </div>
+  </div>
+
+  <div class="srow">
+    <div class="sc"><div class="sl">🏆 Champion</div><div class="sv" id="s-top">—</div><div class="ss" id="s-topcnt">aucun rot</div></div>
+    <div class="sc"><div class="sl">⚡ Dernier rot</div><div class="sv" id="s-last">—</div><div class="ss" id="s-lasttime">jamais</div></div>
+    <div class="sc"><div class="sl">👥 Roteurs uniques</div><div class="sv" id="s-uniq">0</div><div class="ss">participants</div></div>
+  </div>
+
+  <div class="lcard">
+    <div class="lhead"><span>Journal</span><button class="lclear" onclick="clearLog()">Effacer</button></div>
+    <ul id="logul"><li class="lempty" id="lempty">En attente de rots... 💨</li></ul>
+  </div>
+</div>
+
+<script>
+// ── Redirect URL dynamique ──
+const redirectUrl = location.href.split('?')[0].split('#')[0];
+document.getElementById('redirect-url').textContent = redirectUrl;
+
+// ── State ──
+let ws=null, rotCount=0, userCounts={}, channel='', pingTimer=null;
+
+// ── Auth OAuth Implicit Flow ──
+function startAuth(){
+  const clientId = document.getElementById('inp-clientid').value.trim();
+  channel = document.getElementById('inp-channel').value.trim().toLowerCase();
+  if(!clientId||!channel){ showErr('Remplis les deux champs.'); return; }
+
+  // Sauvegarder pour après le redirect
+  sessionStorage.setItem('twitch_clientid', clientId);
+  sessionStorage.setItem('twitch_channel', channel);
+
+  const scopes = 'chat:read';
+  const url = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=token&scope=${scopes}`;
+  location.href = url;
+}
+
+// ── Récupérer le token après redirect ──
+function getTokenFromHash(){
+  const hash = location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+  return params.get('access_token');
+}
+
+function init(){
+  const token = getTokenFromHash();
+  if(!token) return; // pas de token, on reste sur le setup
+
+  // Nettoyer l'URL
+  history.replaceState(null,'',location.pathname);
+
+  const clientId = sessionStorage.getItem('twitch_clientid');
+  channel = sessionStorage.getItem('twitch_channel') || '';
+
+  if(!clientId||!channel){
+    showErr('Session expirée, recommence.');
+    return;
+  }
+
+  connectIRC(token, channel);
+}
+
+// ── IRC WebSocket Twitch ──
+function connectIRC(token, ch){
+  ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+
+  ws.onopen = ()=>{
+    ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+    ws.send(`PASS oauth:${token}`);
+    ws.send(`NICK justinfan${Math.floor(Math.random()*99999)}`); // lecture seule anonyme en fallback
+    ws.send(`JOIN #${ch}`);
+  };
+
+  ws.onmessage = e=>{
+    const raw = e.data.trim();
+    if(raw.startsWith('PING')){ ws.send('PONG :tmi.twitch.tv'); return; }
+    if(raw.includes('Login authentication failed')){ showErr('Token invalide.'); ws.close(); return; }
+    if(raw.includes(`JOIN #${ch}`)){ onConnected(ch); }
+    if(raw.includes('PRIVMSG')){ parseMsg(raw); }
+  };
+
+  ws.onerror = ()=>{ showErr('Erreur WebSocket. Vérifie ton Client ID et réessaie.'); };
+  ws.onclose = ()=>{ setDot(false); document.getElementById('slabel').textContent='Déconnecté'; stopPing(); };
+
+  pingTimer = setInterval(()=>{ if(ws&&ws.readyState===1) ws.send('PING :tmi.twitch.tv'); }, 60000);
+}
+
+function parseMsg(raw){
+  // Support tags + fallback simple
+  let username='', message='';
+
+  // Avec tags: @display-name=Foo;... :foo!foo@foo.tmi.twitch.tv PRIVMSG #ch :msg
+  const tagMatch = raw.match(/display-name=([^;]+);/);
+  if(tagMatch) username = tagMatch[1].toLowerCase();
+
+  const privMatch = raw.match(/PRIVMSG #\w+ :(.+)$/);
+  if(!privMatch) return;
+  message = privMatch[1].trim();
+
+  if(!username){
+    const nickMatch = raw.match(/^(?:@\S+ )?:(\w+)!/);
+    if(nickMatch) username = nickMatch[1];
+  }
+
+  if(message.toLowerCase()==='!rot' && username) handleRot(username);
+}
+
+function handleRot(user){
+  rotCount++;
+  userCounts[user]=(userCounts[user]||0)+1;
+  const el=document.getElementById('rotnum');
+  el.textContent=rotCount;
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+  addLog(user);
+  updateStats(user);
+}
+
+function addLog(user){
+  const ul=document.getElementById('logul');
+  const empty=document.getElementById('lempty');
+  if(empty) empty.remove();
+  const t=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const li=document.createElement('li');
+  li.innerHTML=`<span class="lt">${t}</span><span class="lu">${user}</span><span class="lm">a roté 💨 (×${userCounts[user]})</span>`;
+  ul.insertBefore(li,ul.firstChild);
+  while(ul.children.length>80) ul.removeChild(ul.lastChild);
+}
+
+function updateStats(lastUser){
+  let top=null,topVal=0;
+  for(const[u,c] of Object.entries(userCounts)){ if(c>topVal){topVal=c;top=u;} }
+  if(top){ document.getElementById('s-top').textContent=top; document.getElementById('s-topcnt').textContent=`${topVal} rot${topVal>1?'s':''}`; }
+  document.getElementById('s-last').textContent=lastUser;
+  document.getElementById('s-lasttime').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('s-uniq').textContent=Object.keys(userCounts).length;
+}
+
+function onConnected(ch){
+  document.getElementById('setup').style.display='none';
+  const d=document.getElementById('dash');
+  d.style.display='flex';
+  document.getElementById('dch').textContent='#'+ch;
+  setDot(true);
+  document.getElementById('slabel').textContent='En direct';
+}
+
+function setDot(live){
+  const d=document.getElementById('dot');
+  live ? d.classList.add('live') : d.classList.remove('live');
+}
+
+function stopPing(){ if(pingTimer){clearInterval(pingTimer);pingTimer=null;} }
+
+function resetAll(){
+  rotCount=0; userCounts={};
+  document.getElementById('rotnum').textContent='0';
+  document.getElementById('s-top').textContent='—';
+  document.getElementById('s-topcnt').textContent='aucun rot';
+  document.getElementById('s-last').textContent='—';
+  document.getElementById('s-lasttime').textContent='jamais';
+  document.getElementById('s-uniq').textContent='0';
+  document.getElementById('logul').innerHTML='<li class="lempty">Journal remis à zéro.</li>';
+}
+
+function clearLog(){ document.getElementById('logul').innerHTML='<li class="lempty">Journal vidé.</li>'; }
+
+function doDisconnect(){
+  if(ws) ws.close();
+  stopPing();
+  document.getElementById('dash').style.display='none';
+  document.getElementById('setup').style.display='block';
+  setDot(false);
+  document.getElementById('slabel').textContent='Déconnecté';
+  resetAll();
+  sessionStorage.clear();
+}
+
+function showErr(msg){
+  const e=document.getElementById('err');
+  e.textContent='⚠ '+msg;
+  e.style.display='block';
+}
+
+// ── Boot ──
+init();
+</script>
+</body>
+</html>
