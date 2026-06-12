@@ -252,34 +252,38 @@ function parseMsg(raw){
   handleRot(username);
 }
 
-function handleRot(user){
+function handleRot(viewer){
   rotCount++;
-  userCounts[user]=(userCounts[user]||0)+1;
+  // On compte par viewer (qui a tapé !rot) mais on affiche le streamer
+  userCounts[viewer]=(userCounts[viewer]||0)+1;
   const el=document.getElementById('rotnum');
   el.textContent=rotCount;
   el.classList.remove('bump');
   void el.offsetWidth;
   el.classList.add('bump');
-  addLog(user);
-  updateStats(user);
+  addLog(viewer);
+  updateStats(viewer);
 }
 
-function addLog(user){
+function addLog(viewer){
   const ul=document.getElementById('logul');
   const empty=document.getElementById('lempty');
   if(empty) empty.remove();
   const t=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   const li=document.createElement('li');
-  li.innerHTML=`<span class="lt">${t}</span><span class="lu">${user}</span><span class="lm">a roté 💨 (×${userCounts[user]})</span>`;
+  // Affiche le nom du streamer (channel), pas du viewer
+  li.innerHTML=`<span class="lt">${t}</span><span class="lu">${channel}</span><span class="lm">a roté 💨 — signalé par ${viewer} (×${userCounts[viewer]})</span>`;
   ul.insertBefore(li,ul.firstChild);
   while(ul.children.length>80) ul.removeChild(ul.lastChild);
 }
 
-function updateStats(lastUser){
+function updateStats(lastViewer){
   let top=null,topVal=0;
   for(const[u,c] of Object.entries(userCounts)){ if(c>topVal){topVal=c;top=u;} }
-  if(top){ document.getElementById('s-top').textContent=top; document.getElementById('s-topcnt').textContent=`${topVal} rot${topVal>1?'s':''}`; }
-  document.getElementById('s-last').textContent=lastUser;
+  // Champion = viewer qui a signalé le plus de rots
+  if(top){ document.getElementById('s-top').textContent=top; document.getElementById('s-topcnt').textContent=`${topVal} signalement${topVal>1?'s':''}`; }
+  // Dernier rot = toujours le streamer
+  document.getElementById('s-last').textContent=channel;
   document.getElementById('s-lasttime').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('s-uniq').textContent=Object.keys(userCounts).length;
 }
