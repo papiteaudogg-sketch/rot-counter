@@ -247,7 +247,7 @@ function authBot(){
   if(!cid){ showErr('Remplis le Client ID d\'abord.'); return; }
   sessionStorage.setItem('twitch_clientid', cid);
   sessionStorage.setItem('twitch_auth_step', 'bot');
-  const url = `https://id.twitch.tv/oauth2/authorize?client_id=${cid}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=token&scope=chat:read+chat:edit`;
+  const url = `https://id.twitch.tv/oauth2/authorize?client_id=${cid}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=token&scope=chat:read`;
   location.href = url;
 }
 
